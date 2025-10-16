@@ -10,6 +10,7 @@ from docutils.parsers.rst import Directive, directives
 from docutils.parsers.rst.directives import images
 from sphinx.errors import ExtensionError
 from sphinx.util.logging import getLogger
+from sphinx.util.docutils import SphinxDirective
 
 from .backreferences import (
     THUMBNAIL_PARENT_DIV,
@@ -22,8 +23,10 @@ from .utils import _read_json
 
 logger = getLogger("sphinx-gallery")
 
+ExampleInfo = namedtuple("ExampleInfo", ["target_dir", "intro", "title", "arg"])
 
-class MiniGallery(Directive):
+
+class MiniGallery(SphinxDirective):
     """Custom directive to insert a mini-gallery.
 
     The required argument is one or more of the following:
@@ -149,7 +152,6 @@ class MiniGallery(Directive):
             heading_level = self.options.get("heading-level", "^")
             lines.append(heading_level * len(heading))
 
-        ExampleInfo = namedtuple("ExampleInfo", ["target_dir", "intro", "title", "arg"])
         backreferences_all = None
         if backreferences_dir:
             backreferences_all = _read_json(
@@ -175,7 +177,7 @@ class MiniGallery(Directive):
                         target_dir=path[2], intro=path[3], title=path[4], arg=None
                     )
             # Glob path arg input
-            elif paths := Path(src_dir).glob(arg):
+            elif paths := tuple(Path(src_dir).glob(arg)):
                 # Glob paths require extra parsing to get the intro and title
                 # so we don't want to override a duplicate backreference arg input
                 for path in paths:
@@ -184,6 +186,27 @@ class MiniGallery(Directive):
                         continue
                     else:
                         file_paths[path_resolved] = ExampleInfo(None, None, None, arg)
+            else:
+                # If the arg doesn't resolve as a path see if we can
+                # find it as a stem in any of the examples dirs
+                has_found_file = False
+                for examples_dir in config["sphinx_gallery_conf"]["examples_dirs"]:
+                    rel_dir = (Path(src_dir) / examples_dir).resolve()
+                    example_files = tuple(rel_dir.glob(f"**/{arg}*"))
+                    for path_resolved in example_files:
+                        file_paths[path_resolved] = ExampleInfo(
+                            None, None, None, path_resolved
+                        )
+                        has_found_file = True
+                        break
+                    if has_found_file:
+                        break
+                else:
+                    logger.info(
+                        "No examples found for %s",
+                        arg,
+                        location=self.env.current_document.docname,
+                    )
 
         if len(file_paths) == 0:
             return []

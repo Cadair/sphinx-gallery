@@ -78,3 +78,10 @@ Test duplicates
     ../examples/plot_second_future_import*
     sphinx_gallery.py_source_parser.Block
     ../examples/plot_numpy_matplotib.py
+
+
+Filenames not paths
+
+.. minigallery::
+
+   plot_second_future_imports.py
