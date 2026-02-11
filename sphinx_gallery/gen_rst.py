@@ -1484,6 +1484,8 @@ EXAMPLE_HEADER = """
         :ref:`Go to the end <sphx_glr_download_{1}>`
         to download the full example code{2}
 
+.. gallery:example:: {3}
+
 .. rst-class:: sphx-glr-example-title
 
 .. _sphx_glr_{1}:
@@ -1602,6 +1604,7 @@ def save_rst_example(
     example_file = Path(example_file)
     example_fname = str(example_file.relative_to(gallery_conf["src_dir"]))
     ref_fname = example_fname.replace(os.sep, "_")
+    doc_name = "/" + (example_file.relative_to(gallery_conf["src_dir"])).with_suffix("").as_posix()
 
     binder_conf = gallery_conf["binder"]
     is_binder_enabled = len(binder_conf) > 0
@@ -1622,7 +1625,12 @@ def save_rst_example(
         interactive_example_text += "JupyterLite."
 
     example_rst = (
-        EXAMPLE_HEADER.format(example_fname, ref_fname, interactive_example_text)
+        EXAMPLE_HEADER.format(
+            example_fname,
+            ref_fname,
+            interactive_example_text,
+            doc_name,
+        )
         + example_rst
     )
 

@@ -5,6 +5,7 @@
 Attaches Sphinx-Gallery to Sphinx in order to generate the galleries
 when building the documentation.
 """
+from sphinx.directives import ObjectDescription
 
 import codecs
 import copy
@@ -17,9 +18,12 @@ from itertools import chain
 from pathlib import Path
 from textwrap import indent
 from xml.sax.saxutils import escape, quoteattr
+from typing import Type
 
 import sphinx.util
 from docutils import nodes
+from docutils.parsers.rst import Directive
+from sphinx.domains import Domain
 from sphinx.errors import ConfigError, ExtensionError
 from sphinx.util.console import blue, bold, purple, red
 
@@ -1690,6 +1694,60 @@ def setup_template_link_getters(app, pagename, templatename, context, doctree):
     context["get_launcher_links"] = get_launcher_links
 
 
+from sphinx import addnodes
+
+
+class ExampleDirective(ObjectDescription):
+    """A directive for registering an example."""
+
+    has_content = False
+    required_arguments = 1  # example name
+
+    def handle_signature(self, sig, signode):
+        signode += addnodes.desc_name(text=sig)
+        return sig
+
+    def add_target_and_index(self, name_cls, sig, signode):
+        signode['ids'].append('example' + '-' + sig)
+        gallery = self.env.get_domain("gallery")
+        gallery.add_example(sig)
+
+
+class GalleryDomain(Domain):
+    """
+    A sphinx domain for tracking examples and related metadata.
+
+    The functionality this provides is:
+
+    - A way of referencing a gallery example
+    - A way of referencing a gallery (or sub-gallery) index page
+    - A way of referencing a tag
+    """
+
+    name = "gallery"
+    label = "sphinx-gallery"
+
+    roles = {}
+
+    directives: dict[str, Type[Directive]] = {
+        "minigallery": MiniGallery,
+        "image-sg": ImageSg,
+        "example": ExampleDirective,
+    }
+
+    initial_data = {
+        "galleries": [],  # A list of {name: directory}
+        "examples": [],  # A list of {file_name: <>, thumbimage: <>, title: <>, gallery: name}
+        "tags": [], # A list of {tag: [filenames]}
+    }
+
+    def add_example(self, signature):
+        self.data["examples"].append({"doc_name": signature})
+        print(f"Adding example {signature}")
+
+
+
+
 def setup(app):
     """Setup Sphinx-Gallery sphinx extension."""
     app.add_config_value("sphinx_gallery_conf", DEFAULT_GALLERY_CONF, "html")
@@ -1715,6 +1773,8 @@ def setup(app):
     app.add_directive("image-sg", ImageSg)
 
     imagesg_addnode(app)
+
+    app.add_domain(GalleryDomain)
 
     # Early update of sphinx_gallery_conf at builder-inited
     app.connect("builder-inited", update_gallery_conf_builder_inited, priority=10)
